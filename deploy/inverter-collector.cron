@@ -1,0 +1,11 @@
+# Host cron entry for the collector job.
+# Keep this on the host, not inside the container, so Docker Compose injects
+# env_file values directly into the one-shot collector process.
+#
+# Schedule: 20:00 Asia/Bangkok.
+# iSolarCloud and FusionSolar plant values are expected to be stable after 19:00.
+# If the server timezone is UTC, this is 13:00 UTC.
+SHELL=/bin/sh
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+0 13 * * * cd /opt/inverter-data-collector && INVERTER_RUNTIME_ROOT=/srv/inverter-data-collector docker compose run --rm collector >> /srv/inverter-data-collector/logs/cron.log 2>&1

@@ -1,0 +1,13 @@
+# Local macOS cron entry for testing the collector schedule.
+#
+# Install manually with:
+#   crontab deploy/inverter-collector.local.cron
+#
+# Check with:
+#   crontab -l
+#
+# Remove with:
+#   crontab -r
+#
+# Schedule: every 30 minutes in the local machine timezone.
+*/30 * * * * cd /Users/greenz/inverter-data-collector && INVERTER_RUNTIME_ROOT=/Users/greenz/inverter-data-collector-runtime /usr/local/bin/docker compose run --rm collector >> /Users/greenz/inverter-data-collector-runtime/logs/cron.log 2>&1
