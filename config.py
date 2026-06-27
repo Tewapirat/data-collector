@@ -93,6 +93,7 @@ def load_config(
 
         account_ids: set[str] = set()
         plant_codes: set[str] = set()
+        sungrow_meteo_ps_keys: set[str] = set()
         accounts: list[dict[str, Any]] = []
         for account_index, account_raw in enumerate(accounts_raw):
             account_path = f"{vendor_path}.accounts[{account_index}]"
@@ -167,7 +168,34 @@ def load_config(
                         f"vendor {vendor_name!r}"
                     )
                 plant_codes.add(code)
-                plants.append({"name": name, "code": code})
+                plant = {"name": name, "code": code}
+                if vendor_name == "sungrow" and "meteo" in plant_raw:
+                    meteo_raw = plant_raw.get("meteo")
+                    if not isinstance(meteo_raw, dict):
+                        errors.append(f"{plant_path}.meteo must be a mapping")
+                    else:
+                        meteo_path = f"{plant_path}.meteo"
+                        meteo_ps_key = _required_text(
+                            meteo_raw.get("ps_key"),
+                            f"{meteo_path}.ps_key",
+                            errors,
+                        )
+                        meteo_name_raw = meteo_raw.get("name")
+                        meteo: dict[str, str] = {"ps_key": meteo_ps_key}
+                        if meteo_name_raw is not None:
+                            meteo["name"] = _required_text(
+                                meteo_name_raw,
+                                f"{meteo_path}.name",
+                                errors,
+                            )
+                        if meteo_ps_key in sungrow_meteo_ps_keys:
+                            errors.append(
+                                f"{meteo_path}.ps_key duplicates meteo ps_key "
+                                f"{meteo_ps_key!r} within vendor {vendor_name!r}"
+                            )
+                        sungrow_meteo_ps_keys.add(meteo_ps_key)
+                        plant["meteo"] = meteo
+                plants.append(plant)
 
             accounts.append(
                 {

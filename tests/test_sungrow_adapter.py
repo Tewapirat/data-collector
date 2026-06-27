@@ -21,15 +21,30 @@ def sungrow_record(
     code: str,
     *,
     daily_yield: object = "4147700.0",
-    irradiation: object = "5718.2808",
     device_time: str = "20260616150000",
 ) -> dict[str, object]:
     return {
         "device_point": {
             "ps_key": f"{code}_11_0_0",
             "p83022": daily_yield,
-            "p83013": irradiation,
             "device_time": device_time,
+        }
+    }
+
+
+def meteo_record(
+    code: str,
+    *,
+    irradiation: object = "5718.2808",
+    device_time: str = "20260616150500",
+    device_name: str = "Meteo Station1",
+) -> dict[str, object]:
+    return {
+        "device_point": {
+            "ps_key": f"{code}_5_1_1",
+            "p2001": irradiation,
+            "device_time": device_time,
+            "device_name": device_name,
         }
     }
 
@@ -90,6 +105,10 @@ def test_sungrow_maps_out_of_order_response_by_code() -> None:
         "acc",
         configured,
         sungrow.BatchResult(records=records, failed_ps_keys=()),
+        {
+            "P0": meteo_record("P0")["device_point"],
+            "P1": meteo_record("P1", irradiation="6000")["device_point"],
+        },
     )
 
     assert [row["plant_code"] for row in rows] == ["P0", "P1"]
@@ -97,8 +116,9 @@ def test_sungrow_maps_out_of_order_response_by_code() -> None:
         Decimal("10"),
         Decimal("20"),
     ]
-    assert rows[0]["daily_irradiation_w_m2"] == Decimal("5718.2808")
-    assert rows[0]["collect_time"] == "2026-06-16T15:00:00+07:00"
+    assert rows[0]["daily_irradiation_wh_m2"] == Decimal("5718.2808")
+    assert rows[0]["meteo_name"] == "Meteo Station1"
+    assert rows[0]["collect_time"] == "2026-06-16T15:05:00+07:00"
     assert rows[0]["no"] == 1
     assert list(rows[0]) == list(sungrow.SCHEMA)
 
@@ -106,7 +126,7 @@ def test_sungrow_maps_out_of_order_response_by_code() -> None:
 def test_sungrow_missing_null_and_empty_metrics_are_recorded_as_none() -> None:
     configured = plants(3)
     missing_metric = sungrow_record("P0")
-    del missing_metric["device_point"]["p83013"]
+    del missing_metric["device_point"]["p83022"]
 
     rows = make_adapter().map_records(
         "acc",
@@ -115,16 +135,111 @@ def test_sungrow_missing_null_and_empty_metrics_are_recorded_as_none() -> None:
             records=[
                 missing_metric,
                 sungrow_record("P1", daily_yield=None),
-                sungrow_record("P2", irradiation=""),
+                sungrow_record("P2"),
             ],
             failed_ps_keys=(),
         ),
     )
 
     assert [row["plant_code"] for row in rows] == ["P0", "P1", "P2"]
-    assert rows[0]["daily_irradiation_w_m2"] is None
+    assert rows[0]["daily_yield_wh"] is None
     assert rows[1]["daily_yield_wh"] is None
-    assert rows[2]["daily_irradiation_w_m2"] is None
+    assert rows[2]["daily_irradiation_wh_m2"] is None
+
+
+def test_sungrow_meteo_mapping_is_merged_by_ps_key() -> None:
+    configured = [
+        {
+            "name": "Plant 0",
+            "code": "P0",
+            "meteo": {"ps_key": "P0_5_7_1", "name": "Meteo A"},
+        },
+        {
+            "name": "Plant 1",
+            "code": "P1",
+            "meteo": {"ps_key": "P1_5_8_1", "name": "Meteo B"},
+        },
+    ]
+    adapter = make_adapter(config=sungrow_config())
+
+    rows = adapter.map_records(
+        "acc",
+        configured,
+        sungrow.BatchResult(
+            records=[sungrow_record("P0"), sungrow_record("P1")],
+            failed_ps_keys=(),
+        ),
+        adapter._index_meteo_records(
+            "acc",
+            [
+                {
+                    "device_point": {
+                        "ps_key": "P1_5_8_1",
+                        "p2001": "20.5",
+                        "device_time": "20260616150600",
+                        "device_name": "Meteo B",
+                    }
+                },
+                {
+                    "device_point": {
+                        "ps_key": "P0_5_7_1",
+                        "p2001": "10.75",
+                        "device_time": "20260616150500",
+                        "device_name": "Meteo A",
+                    }
+                },
+            ],
+            {
+                plant["meteo"]["ps_key"]: plant["code"]
+                for plant in configured
+            },
+        ),
+    )
+
+    assert [row["daily_irradiation_wh_m2"] for row in rows] == [
+        Decimal("10.75"),
+        Decimal("20.5"),
+    ]
+    assert [row["meteo_name"] for row in rows] == ["Meteo A", "Meteo B"]
+
+
+@pytest.mark.asyncio
+async def test_sungrow_meteo_failed_ps_key_is_not_used() -> None:
+    class MeteoClient:
+        async def fetch_meteo_batch(self, token, batch):
+            return sungrow.BatchResult(
+                records=[
+                    {
+                        "device_point": {
+                            "ps_key": "P0_5_7_1",
+                            "p2001": "10.75",
+                            "device_time": "20260616150500",
+                            "device_name": "Meteo A",
+                        }
+                    }
+                ],
+                failed_ps_keys=("P0_5_7_1",),
+            )
+
+    adapter = sungrow.SungrowAdapter(
+        MeteoClient(),
+        sungrow_config(),
+        FETCHED_AT,
+    )
+
+    records = await adapter.fetch_meteo_records(
+        "acc",
+        "token",
+        [
+            {
+                "name": "Plant 0",
+                "code": "P0",
+                "meteo": {"ps_key": "P0_5_7_1", "name": "Meteo A"},
+            }
+        ],
+    )
+
+    assert records == {}
 
 
 @pytest.mark.asyncio

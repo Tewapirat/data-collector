@@ -16,6 +16,7 @@ BASE_COLUMNS = ("no", "plant_name", "plant_code") ## ชื่อคอลัม
 
 class DeviceType(IntEnum):
     PLANT = 11
+    METEO = 5
 
 ## ===========================================================
 ## mapping ระหว่าง Point ID, Response Key และชื่อคอลัมน์ CSV
@@ -29,11 +30,15 @@ class PointDefinition:
 ## ===========================================================
 ## metrics ที่ต้องการดึง เช่น daily yield และ irradiation
 ## ===========================================================
-POINTS = (
+PLANT_POINTS = (
     PointDefinition("83022", "p83022", "daily_yield_wh"),
-    PointDefinition("83013", "p83013", "daily_irradiation_w_m2"),
 )
-SCHEMA = BASE_COLUMNS + tuple(point.column for point in POINTS) + (
+METEO_POINT = PointDefinition("2001", "p2001", "daily_irradiation_wh_m2")
+POINTS = PLANT_POINTS + (METEO_POINT,)
+SCHEMA = BASE_COLUMNS + (
+    PLANT_POINTS[0].column,
+    METEO_POINT.column,
+    "meteo_name",
     "fetched_at",
     "collect_time",
 )

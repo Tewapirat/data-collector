@@ -68,6 +68,51 @@ def test_load_config_resolves_secret_and_url(tmp_path: Path) -> None:
     assert vendor["accounts"][0]["password"] == "secret"
 
 
+def test_load_config_preserves_sungrow_meteo_mapping(tmp_path: Path) -> None:
+    content = VALID_YAML.replace(
+        "            code: P1",
+        """            code: P1
+            meteo:
+              name: Meteo Station1
+              ps_key: P1_5_1_1""",
+    )
+
+    config = load_config(
+        write_config(tmp_path, content),
+        environ=SUNGROW_ENV,
+    )
+
+    plant = config["vendors"]["sungrow"]["accounts"][0]["plants"][0]
+    assert plant["meteo"] == {
+        "name": "Meteo Station1",
+        "ps_key": "P1_5_1_1",
+    }
+
+
+def test_duplicate_sungrow_meteo_ps_key_fails(tmp_path: Path) -> None:
+    content = """
+vendors:
+  sungrow:
+    batch_size: 10
+    max_concurrency: 2
+    accounts:
+      - id: acc_1
+        username: operator@example.com
+        password_env: ACCOUNT_PASSWORD
+        plants:
+          - name: Plant One
+            code: P1
+            meteo:
+              ps_key: SAME_5_1_1
+          - name: Plant Two
+            code: P2
+            meteo:
+              ps_key: SAME_5_1_1
+"""
+    with pytest.raises(ConfigError, match="duplicates meteo ps_key"):
+        load_config(write_config(tmp_path, content), environ=SUNGROW_ENV)
+
+
 def test_missing_secret_fails_before_collection(tmp_path: Path) -> None:
     with pytest.raises(ConfigError, match="ACCOUNT_PASSWORD"):
         load_config(

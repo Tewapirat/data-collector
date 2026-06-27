@@ -10,7 +10,6 @@ def sungrow_record(code: str) -> dict[str, object]:
         "device_point": {
             "ps_key": f"{code}_11_0_0",
             "p83022": "4147700.0",
-            "p83013": "5718.2808",
             "device_time": "20260616150000",
         }
     }
@@ -157,10 +156,56 @@ async def test_sungrow_data_request_uses_exact_contract() -> None:
                     "appkey": "app-key",
                     "token": "session-token",
                     "device_type": 11,
-                    "point_id_list": ["83022", "83013"],
+                    "point_id_list": ["83022"],
                     "ps_key_list": ["1286347_11_0_0"],
                 },
             },
         )
     ]
 
+
+@pytest.mark.asyncio
+async def test_sungrow_meteo_request_uses_exact_contract() -> None:
+    session = FakeSession(
+        {
+            "result_code": "1",
+            "result_msg": "success",
+            "result_data": {
+                "fail_ps_key_list": [],
+                "device_point_list": [
+                    {
+                        "device_point": {
+                            "ps_key": "1286347_5_17_1",
+                            "p2001": "5337.5708",
+                            "device_time": "20260626153000",
+                        }
+                    }
+                ],
+            },
+        }
+    )
+    client = sungrow.SungrowClient(
+        session, sungrow_config(), asyncio.Semaphore(1)
+    )
+
+    result = await client.fetch_meteo_batch("session-token", ["1286347_5_17_1"])
+
+    assert result.failed_ps_keys == ()
+    assert session.calls == [
+        (
+            "https://gateway.isolarcloud.com.hk/openapi/getDeviceRealTimeData",
+            {
+                "headers": {
+                    "x-access-key": "access-key",
+                    "sys_code": "sys-code",
+                },
+                "json": {
+                    "appkey": "app-key",
+                    "token": "session-token",
+                    "device_type": 5,
+                    "point_id_list": ["2001"],
+                    "ps_key_list": ["1286347_5_17_1"],
+                },
+            },
+        )
+    ]

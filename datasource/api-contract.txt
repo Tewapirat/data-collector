@@ -1,0 +1,255 @@
+#### Sungrow ####
+## API LOGIN 
+EndPoint : https://gateway.isolarcloud.com.hk/openapi/login
+Request : 
+    {
+        "appkey": "<redacted>",
+        "user_account": "services@greenergythailand.com",
+        "user_password": "<redacted>",
+        "lang": "_en_US"
+    }
+Response : 
+    {
+    "req_serial_num": "20260623adb9475eb635c6c1b8765291",
+    "result_code": "1",
+    "result_msg": "success",
+    "result_data": {
+        "user_master_org_id": "156056",
+        "mobile_tel": null,
+        "user_name": "Service Team",
+        "language": "English",
+        "token": "<redacted>",
+        "err_times": "0",
+        "user_id": "79044",
+        "login_state": "1",
+        "disable_time": null,
+        "country_name": "Thailand",
+        "user_account": "<redacted>",
+        "user_master_org_name": "<redacted>",
+        "email": "<redacted>",
+        "country_id": "193"
+    }
+}
+
+็## Header
+x-access-key : <redacted>
+sys_code : <redacted>
+
+
+## API Get Data PV Yield
+EndPoint : https://gateway.isolarcloud.com.hk/openapi/getDeviceRealTimeData
+Request :
+    {
+        "appkey": "<redacted>",
+        "token": "<redacted>",
+	    "device_type":11,
+	    "point_id_list":[
+            "83022"
+	    ],
+        "ps_key_list":[
+            "<plant_code>_11_0_0"
+    ]
+}
+
+Response : 
+{
+    "req_serial_num": "20260616c5c74c7e8697162ce72439d3",
+    "result_code": "1",
+    "result_msg": "success",
+    "result_data": {
+        "fail_ps_key_list": [],
+        "device_point_list": [
+            {
+                "device_point": {
+                    "ps_key": "<plant_code>_11_0_0",
+                    "device_sn": null,
+                    "dev_status": 1,
+                    "uuid": 4596175,
+                    "p83022": "4147700.0",
+                    "device_name": "SCF SOLAR",
+                    "dev_fault_status": 4,
+                    "ps_id": <plant_code>,
+                    "communication_dev_sn": null,
+                    "device_time": "20260616150000"
+                }
+            }
+        ]
+    }
+}
+
+## point_id
+
+83022:Daily Yield of Plant (Wh)
+
+
+## device_type 
+11:plant
+5:Meteo Station
+
+## API Get Data Meteo Daily Horizontal Irradiation
+EndPoint : https://gateway.isolarcloud.com.hk/openapi/getDeviceRealTimeData
+Request :
+    {
+        "appkey": "<redacted>",
+        "token": "<redacted>",
+	   "device_type":5,
+	"point_id_list":[
+        "2001"
+	],
+    "ps_key_list":[
+        "<ps_key_meteo_x>"
+    ]
+}
+
+Response : 
+{
+    "req_serial_num": "20260616c5c74c7e8697162ce72439d3",
+    "result_code": "1",
+    "result_msg": "success",
+    "result_data": {
+        "fail_ps_key_list": [],
+        "device_point_list": [
+            {
+                "device_point": {
+	                    "ps_key": "<ps_key_meteo_x>",
+	                    "device_sn": null,
+	                    "dev_status": 1,
+	                    "p2001": "5718.2808",
+	                    "uuid": 4596175,
+	                    "device_name": "Meteo Station1",
+	                    "dev_fault_status": 4,
+	                    "ps_id": <plant_code>,
+                    "communication_dev_sn": null,
+                    "device_time": "20260616150000"
+                }
+            }
+        ]
+    }
+}
+
+
+
+
+
+
+#### Huawei ####
+## API LOGIN 
+EndPoint : https://sg5.fusionsolar.huawei.com/thirdData/login
+Request: 
+    {
+        "userName": "username",
+        "systemCode": "systemscode"
+    }
+Response: 
+    {
+        "data": null,
+        "success": true,
+        "failCode": 0,
+        "params": {},
+        "message": "Northbound API Reference: https://info.support.huawei.com/DpinfoAppBiz/#/u?i=TxvNXxKe&l=en_US"
+    }
+
+## API Get Data
+EndPoint:https://sg5.fusionsolar.huawei.com/thirdData/getKpiStationDay
+Request:
+    {
+        "stationCodes": "NE=53799865,NE=33962275",
+        "collectTime": 1781888400000
+    }   
+Response:
+{
+    "data": [
+        {
+            "collectTime": 1780246800000,
+            "stationCode": "NE=33962275",
+            "dataItemMap": {
+                "inverter_power": 52.92,
+                "inverterYield": 52.92,
+                "selfUsePower": 34.29,
+                "reduction_total_tree": 0.034,
+                "power_profit": 246.73,
+                "PVYield": 52.92,
+                "perpower_ratio": 4.414,
+                "reduction_total_co2": 0.025,
+                "selfProvide": 34.29,
+                "installed_capacity": 11.99,
+                "use_power": 74.4,
+                "reduction_total_coal": 0.021,
+                "ongrid_power": 18.63,
+                "buyPower": 40.11
+            }
+        },
+        {
+            "collectTime": 1780333200000,
+            "stationCode": "NE=33962275",
+            "dataItemMap": {
+                "inverter_power": 45.74,
+                "inverterYield": 45.74,
+                "selfUsePower": 29.67,
+                "reduction_total_tree": 0.03,
+                "power_profit": 213.38,
+                "PVYield": 45.74,
+                "perpower_ratio": 3.815,
+                "reduction_total_co2": 0.022,
+                "selfProvide": 29.67,
+                "installed_capacity": 11.99,
+                "use_power": 74.26,
+                "reduction_total_coal": 0.018,
+                "ongrid_power": 16.07,
+                "buyPower": 44.59
+            }
+        },
+         {
+            "collectTime": 1780246800000,
+            "stationCode": "NE=53799865",
+            "dataItemMap": {
+                "inverter_power": 14590.17,
+                "inverterYield": 14590.17,
+                "selfUsePower": 14590.17,
+                "reduction_total_tree": 9.468,
+                "theory_power": 19647.717,
+                "PVYield": 14590.17,
+                "perpower_ratio": 5.071,
+                "reduction_total_co2": 6.93,
+                "performance_ratio": 74.259,
+                "selfProvide": 14590.17,
+                "radiation_intensity": 6.829,
+                "installed_capacity": 2877.03,
+                "use_power": 90505.43,
+                "reduction_total_coal": 5.836,
+                "ongrid_power": 0,
+                "buyPower": 75915.26
+            }
+        },
+        {
+            "collectTime": 1780333200000,
+            "stationCode": "NE=53799865",
+            "dataItemMap": {
+                "inverter_power": 13307.04,
+                "inverterYield": 13307.04,
+                "selfUsePower": 13307.04,
+                "reduction_total_tree": 8.635,
+                "theory_power": 17517.117,
+                "PVYield": 13307.04,
+                "perpower_ratio": 4.625,
+                "reduction_total_co2": 6.321,
+                "performance_ratio": 75.966,
+                "selfProvide": 13307.04,
+                "radiation_intensity": 6.089,
+                "installed_capacity": 2877.03,
+                "use_power": 91843.74,
+                "reduction_total_coal": 5.323,
+                "ongrid_power": 0,
+                "buyPower": 78536.7
+            }
+        }
+    ],
+    "failCode": 0,
+    "message": null,
+    "params": {
+        "currentTime": 1782135883060,
+        "collectTime": 1781888400000,
+        "stationCodes": "NE=53799865,NE=33962275"
+    },
+    "success": true
+}

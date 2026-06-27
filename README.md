@@ -38,9 +38,11 @@ SUNGROW_SYS_CODE=
 SUNGROW_ACC_001_PASSWORD=
 ```
 
-The Sungrow adapter requests plant device type `11` with point IDs `83022`
-(daily yield in Wh) and `83013` (daily irradiation in W/m²). It writes both the
-collector timestamp and the Asia/Bangkok device timestamp.
+The Sungrow adapter requests plant device type `11` with point ID `83022`
+(daily yield in Wh), then requests meteo device type `5` with point ID `2001`
+(daily horizontal irradiation in Wh/m²) using optional per-plant `meteo.ps_key`
+entries in `config/plants.yaml`. It writes both the collector timestamp and the
+Asia/Bangkok device timestamp.
 
 Sungrow implementation is split by responsibility:
 
