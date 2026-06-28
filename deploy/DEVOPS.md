@@ -78,6 +78,51 @@ or from systemd using `deploy/inverter-collector.service` and
 `deploy/inverter-collector.timer`. Install exactly one scheduler. The one-shot
 compose command receives the configured `env_file` directly.
 
+## Optional All-In-One Container
+
+The `app` service is an alternate deployment mode that keeps the existing
+collector and fileserver services intact. It runs nginx and supercronic in one
+long-lived container, and supercronic runs `python collector.py` at 20:00
+Asia/Bangkok. The collector is not run when the container starts.
+
+Build and start it:
+
+```bash
+cd /opt/inverter-data-collector
+INVERTER_RUNTIME_ROOT=/srv/inverter-data-collector docker compose build app
+INVERTER_RUNTIME_ROOT=/srv/inverter-data-collector docker compose up -d app
+```
+
+The all-in-one fileserver is exposed at:
+
+```text
+http://127.0.0.1:8080/
+```
+
+Run the collector manually through the all-in-one image:
+
+```bash
+INVERTER_RUNTIME_ROOT=/srv/inverter-data-collector docker compose run --rm app python collector.py
+```
+
+Before relying on the all-in-one schedule, disable host cron or the systemd
+timer. Do not run host scheduling and the all-in-one scheduler at the same
+time; the collector lock is a guard, not the primary scheduling design.
+
+Check the supervised processes:
+
+```bash
+INVERTER_RUNTIME_ROOT=/srv/inverter-data-collector docker compose exec app supervisorctl status
+```
+
+Rollback to the split deployment:
+
+```bash
+INVERTER_RUNTIME_ROOT=/srv/inverter-data-collector docker compose stop app
+INVERTER_RUNTIME_ROOT=/srv/inverter-data-collector docker compose up -d fileserver
+INVERTER_RUNTIME_ROOT=/srv/inverter-data-collector docker compose run --rm collector
+```
+
 ## Scheduling
 
 The production schedule is 20:00 Asia/Bangkok, after iSolarCloud and

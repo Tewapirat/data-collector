@@ -11,6 +11,7 @@ Use these Docker Hub images by default:
 ```text
 apiratgrz/inverter-data-collector:collector-latest
 apiratgrz/inverter-data-collector:fileserver-latest
+apiratgrz/inverter-data-collector:app-latest
 ```
 
 For production, prefer immutable release tags when available, for example:
@@ -18,10 +19,13 @@ For production, prefer immutable release tags when available, for example:
 ```text
 apiratgrz/inverter-data-collector:collector-2026-06-26
 apiratgrz/inverter-data-collector:fileserver-2026-06-26
+apiratgrz/inverter-data-collector:app-2026-06-26
 ```
 
 `collector-latest` and `fileserver-latest` should be used for testing or when
-the team intentionally wants the newest published image.
+the team intentionally wants the newest published image. The `all-in-one`
+image is an alternate deployment mode and should not be run together with host
+cron or the systemd timer.
 
 ## Server Layout
 
@@ -99,6 +103,30 @@ services:
       - ${INVERTER_RUNTIME_ROOT:-/srv/inverter-data-collector}/nginx.conf:/etc/nginx/conf.d/default.conf:ro
 ```
 
+Optional all-in-one service:
+
+```yaml
+services:
+  app:
+    image: apiratgrz/inverter-data-collector:app-latest
+    restart: unless-stopped
+    env_file: ${INVERTER_RUNTIME_ROOT:-/srv/inverter-data-collector}/.env
+    environment:
+      TZ: Asia/Bangkok
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ${INVERTER_RUNTIME_ROOT:-/srv/inverter-data-collector}/config/plants.yaml:/app/config/plants.yaml:ro
+      - ${INVERTER_RUNTIME_ROOT:-/srv/inverter-data-collector}/data/sungrow:/app/data/sungrow
+      - ${INVERTER_RUNTIME_ROOT:-/srv/inverter-data-collector}/data/huawei:/app/data/huawei
+      - ${INVERTER_RUNTIME_ROOT:-/srv/inverter-data-collector}/data/.locks:/app/data/.locks
+      - ${INVERTER_RUNTIME_ROOT:-/srv/inverter-data-collector}/logs:/app/logs
+```
+
+This service runs nginx and supercronic in one container. Supercronic runs the
+collector at 20:00 Asia/Bangkok and does not run the collector at container
+startup.
+
 The fileserver HTML, CSS, and logo are baked into the `fileserver` image. Do
 not mount source `fileserver/` assets on the server.
 
@@ -138,6 +166,10 @@ batch, writes CSV/log files into the runtime directory, then exits.
 
 Install exactly one scheduler: host cron or a systemd timer. Do not run cron
 inside the collector container.
+
+If using the optional `app` all-in-one service, do not install host cron or the
+systemd timer. The `app` container already includes the 20:00 Asia/Bangkok
+schedule through supercronic.
 
 Production schedule: 20:00 Asia/Bangkok, after iSolarCloud and
 FusionSolar plant values are expected to be stable. On a UTC server, that is
