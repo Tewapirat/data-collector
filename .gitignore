@@ -21,5 +21,7 @@ scripts/
 tests/
 docs/
 datasource/
+deploy/*
+!deploy/RUNBOOK.md
 
 config/*.yaml

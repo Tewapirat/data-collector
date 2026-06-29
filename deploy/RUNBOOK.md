@@ -16,7 +16,7 @@ apiratgrz/inverter-data-collector:app-latest
 For production, prefer an immutable release tag when available, for example:
 
 ```text
-apiratgrz/inverter-data-collector:app-2026-06-28
+apiratgrz/inverter-data-collector:app-2026-06-29
 ```
 
 ## Server Layout
@@ -75,7 +75,7 @@ Place this at `/opt/inverter-data-collector/docker-compose.yml`:
 ```yaml
 services:
   app:
-    image: apiratgrz/inverter-data-collector:app-latest
+    image: apiratgrz/inverter-data-collector:app-2026-06-29
     restart: unless-stopped
     env_file: ${INVERTER_RUNTIME_ROOT:-/srv/inverter-data-collector}/.env
     environment:

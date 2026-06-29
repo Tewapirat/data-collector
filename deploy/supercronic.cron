@@ -1,3 +1,0 @@
-# Run after iSolarCloud and FusionSolar daily values are expected to be stable.
-# The all-in-one image sets TZ=Asia/Bangkok, so this is local Bangkok time.
-0 20 * * * cd /app && python collector.py >> /app/logs/cron.log 2>&1
