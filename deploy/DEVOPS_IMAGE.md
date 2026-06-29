@@ -14,6 +14,8 @@ apiratgrz/inverter-data-collector:fileserver-latest
 apiratgrz/inverter-data-collector:app-latest
 ```
 
+For all-in-one app image deployment, use `deploy/DEVOPS_APP_IMAGE.md`.
+
 For production, prefer immutable release tags when available, for example:
 
 ```text

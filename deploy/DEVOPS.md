@@ -3,7 +3,8 @@
 This runbook deploys the collector as a one-shot Docker Compose job and nginx
 as the only long-lived container. Do not run cron inside the collector
 container. For Docker Hub image deployment without a source checkout, use
-`deploy/DEVOPS_IMAGE.md` and `deploy/docker-compose.images.yml`.
+`deploy/DEVOPS_IMAGE.md` and `deploy/docker-compose.images.yml`. For the
+all-in-one app image deployment, use `deploy/DEVOPS_APP_IMAGE.md`.
 
 ## Runtime Layout
 
