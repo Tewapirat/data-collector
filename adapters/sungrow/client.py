@@ -14,7 +14,8 @@ from .contract import (
     DATA_PATH,
     LANGUAGE,
     LOGIN_PATH,
-    POINTS,
+    METEO_POINTS,
+    PLANT_POINTS,
     BatchResult,
     DeviceType,
     make_ps_key,
@@ -110,11 +111,32 @@ class SungrowClient:
                 "appkey": self._app_key,
                 "token": token,
                 "device_type": int(DeviceType.PLANT),
-                "point_id_list": [point.point_id for point in POINTS],
+                "point_id_list": [point.point_id for point in PLANT_POINTS],
                 "ps_key_list": [make_ps_key(plant["code"]) for plant in plants],
             },
         )
-        result_data = self._result_data(payload, "getDeviceRealTimeData")
+        return self._parse_batch_result(payload)
+
+    async def fetch_meteo_batch(
+        self,
+        token: str,
+        ps_keys: list[str],
+    ) -> BatchResult:
+        payload = await self._post(
+            DATA_PATH,
+            {
+                "appkey": self._app_key,
+                "token": token,
+                "device_type": int(DeviceType.METEO),
+                "point_id_list": [point.point_id for point in METEO_POINTS],
+                "ps_key_list": ps_keys,
+            },
+        )
+        return self._parse_batch_result(payload)
+
+    @classmethod
+    def _parse_batch_result(cls, payload: dict[str, Any]) -> BatchResult:
+        result_data = cls._result_data(payload, "getDeviceRealTimeData")
         records = result_data.get("device_point_list")
         failed_ps_keys = result_data.get("fail_ps_key_list")
         if not isinstance(records, list):
@@ -124,4 +146,3 @@ class SungrowClient:
         ):
             raise SungrowAPIError("data response has invalid fail_ps_key_list")
         return BatchResult(records=records, failed_ps_keys=tuple(failed_ps_keys))
-

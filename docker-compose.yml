@@ -1,4 +1,22 @@
 services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.all-in-one
+    image: apiratgrz/inverter-data-collector:app-latest
+    restart: unless-stopped
+    env_file: ${INVERTER_RUNTIME_ROOT:-/srv/inverter-data-collector}/.env
+    environment:
+      TZ: Asia/Bangkok
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ${INVERTER_RUNTIME_ROOT:-/srv/inverter-data-collector}/config/plants.yaml:/app/config/plants.yaml:ro
+      - ${INVERTER_RUNTIME_ROOT:-/srv/inverter-data-collector}/data/sungrow:/app/data/sungrow
+      - ${INVERTER_RUNTIME_ROOT:-/srv/inverter-data-collector}/data/huawei:/app/data/huawei
+      - ${INVERTER_RUNTIME_ROOT:-/srv/inverter-data-collector}/data/.locks:/app/data/.locks
+      - ${INVERTER_RUNTIME_ROOT:-/srv/inverter-data-collector}/logs:/app/logs
+
   collector:
     build: .
     profiles:

@@ -27,6 +27,7 @@ ADAPTERS = {
     "sungrow": sungrow,
     "huawei": huawei,
 }
+SUNGROW_SLOPE_COLUMN = "slope_daily_irradiation_wh_m2"
 
 
 @contextmanager
@@ -73,6 +74,40 @@ def configure_logging(log_path: str | Path = "logs/collector.log") -> None:
     LOGGER.addHandler(console_handler)
 
 
+def can_migrate_sungrow_slope_header(
+    brand: str,
+    actual_header: list[str] | None,
+    expected_keys: list[str],
+) -> bool:
+    if (
+        brand != "sungrow"
+        or actual_header is None
+        or SUNGROW_SLOPE_COLUMN not in expected_keys
+    ):
+        return False
+    old_expected_keys = [
+        key for key in expected_keys if key != SUNGROW_SLOPE_COLUMN
+    ]
+    return actual_header == old_expected_keys
+
+
+def migrate_sungrow_slope_header(
+    path: Path,
+    expected_keys: list[str],
+) -> None:
+    with path.open("r", encoding="utf-8", newline="") as existing:
+        rows = list(csv.DictReader(existing))
+
+    temporary_path = path.with_suffix(f"{path.suffix}.tmp")
+    with temporary_path.open("w", encoding="utf-8", newline="") as migrated:
+        writer = csv.DictWriter(migrated, fieldnames=expected_keys)
+        writer.writeheader()
+        for row in rows:
+            row[SUNGROW_SLOPE_COLUMN] = ""
+            writer.writerow({key: row.get(key, "") for key in expected_keys})
+    temporary_path.replace(path)
+
+
 def append_rows(
     brand: str,
     rows: list[dict[str, Any]],
@@ -111,10 +146,17 @@ def append_rows(
             with path.open("r", encoding="utf-8", newline="") as existing:
                 actual_header = next(csv.reader(existing), None)
             if actual_header != expected_keys:
-                raise ValueError(
-                    f"{brand} CSV header mismatch at {path}: "
-                    f"expected {expected_keys}, got {actual_header}"
-                )
+                if can_migrate_sungrow_slope_header(
+                    brand,
+                    actual_header,
+                    expected_keys,
+                ):
+                    migrate_sungrow_slope_header(path, expected_keys)
+                else:
+                    raise ValueError(
+                        f"{brand} CSV header mismatch at {path}: "
+                        f"expected {expected_keys}, got {actual_header}"
+                    )
 
         with path.open("a", encoding="utf-8", newline="") as output:
             writer = csv.DictWriter(

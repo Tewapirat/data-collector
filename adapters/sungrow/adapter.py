@@ -16,7 +16,9 @@ import aiohttp
 
 from .client import SungrowClient
 from .contract import (
-    POINTS,
+    METEO_POINT,
+    PLANT_POINTS,
+    SLOPE_METEO_POINT,
     BatchResult,
     PointDefinition,
     plant_code_from_ps_key,
@@ -28,7 +30,11 @@ BANGKOK = ZoneInfo("Asia/Bangkok")
 ## ===========================================================
 ## แบ่งรายการ plants ตาม batch_size
 ## ===========================================================
-def chunked(items: list[dict[str, str]], size: int) -> list[list[dict[str, str]]]:
+def chunked(items: list[dict[str, Any]], size: int) -> list[list[dict[str, Any]]]:
+    return [items[index : index + size] for index in range(0, len(items), size)]
+
+
+def chunked_values(items: list[str], size: int) -> list[list[str]]:
     return [items[index : index + size] for index in range(0, len(items), size)]
 
 
@@ -50,11 +56,10 @@ class SungrowAdapter:
 ## แปลงเวลา Sungrow เป็น ISO 8601 เวลา Bangkok
 ## ===========================================================
     @staticmethod
-    def _parse_device_time(value: Any) -> str:
+    def _parse_device_datetime(value: Any) -> datetime:
         if not isinstance(value, str):
             raise ValueError("device_time must be a string")
-        parsed = datetime.strptime(value, "%Y%m%d%H%M%S").replace(tzinfo=BANGKOK)
-        return parsed.isoformat()
+        return datetime.strptime(value, "%Y%m%d%H%M%S").replace(tzinfo=BANGKOK)
 
 ## ===========================================================
 ## ตรวจและแปลง metric เป็น Decimal
@@ -119,15 +124,58 @@ class SungrowAdapter:
             by_code[code] = record
         return by_code
 
+    def _index_meteo_records(
+        self,
+        account_id: str,
+        records: list[Any],
+        ps_key_to_code: dict[str, str],
+    ) -> dict[str, dict[str, Any]]:
+        by_code: dict[str, dict[str, Any]] = {}
+        for wrapper in records:
+            if not isinstance(wrapper, dict):
+                LOGGER.error(
+                    "[sungrow][%s] malformed meteo record wrapper_type=%s",
+                    account_id,
+                    type(wrapper).__name__,
+                )
+                continue
+            record = wrapper.get("device_point")
+            if not isinstance(record, dict):
+                LOGGER.error(
+                    "[sungrow][%s] malformed meteo record missing device_point",
+                    account_id,
+                )
+                continue
+            ps_key = record.get("ps_key")
+            if not isinstance(ps_key, str) or ps_key not in ps_key_to_code:
+                LOGGER.error(
+                    "[sungrow][%s] unexpected meteo response ps_key=%s",
+                    account_id,
+                    ps_key,
+                )
+                continue
+            code = ps_key_to_code[ps_key]
+            if code in by_code:
+                LOGGER.error(
+                    "[sungrow][%s] duplicate meteo response plant_code=%s",
+                    account_id,
+                    code,
+                )
+                continue
+            by_code[code] = record
+        return by_code
+
 ## ===========================================================
 ## จับคู่ response กับ YAML plants และสร้าง rows ตาม schema
 ## ===========================================================
     def map_records(
         self,
         account_id: str,
-        plants: list[dict[str, str]],
+        plants: list[dict[str, Any]],
         batch_result: BatchResult,
+        meteo_records: dict[str, dict[str, Any]] | None = None,
     ) -> list[dict[str, Any]]:
+        meteo_records = meteo_records or {}
         failed_codes: set[str] = set()
         for ps_key in batch_result.failed_ps_keys:
             LOGGER.error("[sungrow][%s] API failed ps_key=%s", account_id, ps_key)
@@ -157,10 +205,10 @@ class SungrowAdapter:
                 )
                 continue
             try:
-                device_time = self._parse_device_time(record.get("device_time"))
+                device_time = self._parse_device_datetime(record.get("device_time"))
                 metrics = {
                     point.column: self._parse_optional_decimal(record, point)
-                    for point in POINTS
+                    for point in PLANT_POINTS
                 }
             except ValueError as exc:
                 LOGGER.error(
@@ -170,17 +218,120 @@ class SungrowAdapter:
                     str(exc),
                 )
                 continue
+            target_date = self._fetched_at.astimezone(BANGKOK).date()
+            if device_time.date() != target_date:
+                LOGGER.error(
+                    "[sungrow][%s] collect_date mismatch plant_code=%s "
+                    "collect_date=%s target_date=%s",
+                    account_id,
+                    plant["code"],
+                    device_time.date().isoformat(),
+                    target_date.isoformat(),
+                )
+                continue
+
+            meteo_name = None
+            meteo_irradiation = None
+            slope_meteo_irradiation = None
+            meteo_record = meteo_records.get(plant["code"])
+            if meteo_record is not None:
+                try:
+                    meteo_irradiation = self._parse_optional_decimal(
+                        meteo_record, METEO_POINT
+                    )
+                    if meteo_irradiation is None:
+                        slope_meteo_irradiation = self._parse_optional_decimal(
+                            meteo_record,
+                            SLOPE_METEO_POINT,
+                        )
+                    name = meteo_record.get("device_name")
+                    if isinstance(name, str) and name.strip():
+                        meteo_name = name
+                    else:
+                        meteo = plant.get("meteo", {})
+                        meteo_name = meteo.get("name") or None
+                except ValueError as exc:
+                    LOGGER.error(
+                        "[sungrow][%s] malformed meteo plant_code=%s error=%s",
+                        account_id,
+                        plant["code"],
+                        str(exc),
+                    )
             rows.append(
                 {
                     "no": len(rows) + 1,
                     "plant_name": plant["name"],
                     "plant_code": plant["code"],
                     **metrics,
+                    METEO_POINT.column: meteo_irradiation,
+                    SLOPE_METEO_POINT.column: slope_meteo_irradiation,
+                    "meteo_name": meteo_name,
                     "fetched_at": self._fetched_at.isoformat(),
-                    "collect_time": device_time,
+                    "collect_time": device_time.isoformat(),
                 }
             )
         return rows
+
+    async def fetch_meteo_records(
+        self,
+        account_id: str,
+        token: str,
+        plants: list[dict[str, Any]],
+    ) -> dict[str, dict[str, Any]]:
+        ps_key_to_code: dict[str, str] = {}
+        missing_meteo_count = 0
+        for plant in plants:
+            meteo = plant.get("meteo")
+            if meteo is None:
+                missing_meteo_count += 1
+                continue
+            ps_key_to_code[meteo["ps_key"]] = plant["code"]
+        if missing_meteo_count:
+            LOGGER.info(
+                "[sungrow][%s] plants without meteo mapping count=%d",
+                account_id,
+                missing_meteo_count,
+            )
+
+        meteo_batches = chunked_values(
+            list(ps_key_to_code),
+            self._vendor_config["batch_size"],
+        )
+        results = await asyncio.gather(
+            *(self._client.fetch_meteo_batch(token, batch) for batch in meteo_batches),
+            return_exceptions=True,
+        )
+
+        records: dict[str, dict[str, Any]] = {}
+        for batch, result in zip(meteo_batches, results, strict=True):
+            if isinstance(result, BaseException):
+                LOGGER.error(
+                    "[sungrow][%s] meteo batch failed ps_keys=%s error=%s detail=%s",
+                    account_id,
+                    ",".join(batch),
+                    type(result).__name__,
+                    str(result),
+                )
+                continue
+            failed_codes: set[str] = set()
+            for failed_ps_key in result.failed_ps_keys:
+                LOGGER.error(
+                    "[sungrow][%s] meteo API failed ps_key=%s",
+                    account_id,
+                    failed_ps_key,
+                )
+                code = ps_key_to_code.get(failed_ps_key)
+                if code is not None:
+                    failed_codes.add(code)
+            indexed = self._index_meteo_records(
+                account_id,
+                result.records,
+                ps_key_to_code,
+            )
+            for code in failed_codes:
+                indexed.pop(code, None)
+            records.update(indexed)
+        return records
     
 ## ===========================================================
 ## login หนึ่ง account, เรียกทุก batch พร้อมกัน และแยกความล้มเหลวราย batch
@@ -204,6 +355,11 @@ class SungrowAdapter:
             *(self._client.fetch_batch(token, batch) for batch in batches),
             return_exceptions=True,
         )
+        meteo_records = await self.fetch_meteo_records(
+            account_id,
+            token,
+            account["plants"],
+        )
 
         rows: list[dict[str, Any]] = []
         for batch, result in zip(batches, results, strict=True):
@@ -217,7 +373,7 @@ class SungrowAdapter:
                     str(result),
                 )
                 continue
-            batch_rows = self.map_records(account_id, batch, result)
+            batch_rows = self.map_records(account_id, batch, result, meteo_records)
             rows.extend(batch_rows)
             LOGGER.info(
                 "[sungrow][%s] batch succeeded plants=%d rows=%d",
