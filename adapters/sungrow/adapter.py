@@ -18,6 +18,7 @@ from .client import SungrowClient
 from .contract import (
     METEO_POINT,
     PLANT_POINTS,
+    SLOPE_METEO_POINT,
     BatchResult,
     PointDefinition,
     plant_code_from_ps_key,
@@ -55,11 +56,10 @@ class SungrowAdapter:
 ## แปลงเวลา Sungrow เป็น ISO 8601 เวลา Bangkok
 ## ===========================================================
     @staticmethod
-    def _parse_device_time(value: Any) -> str:
+    def _parse_device_datetime(value: Any) -> datetime:
         if not isinstance(value, str):
             raise ValueError("device_time must be a string")
-        parsed = datetime.strptime(value, "%Y%m%d%H%M%S").replace(tzinfo=BANGKOK)
-        return parsed.isoformat()
+        return datetime.strptime(value, "%Y%m%d%H%M%S").replace(tzinfo=BANGKOK)
 
 ## ===========================================================
 ## ตรวจและแปลง metric เป็น Decimal
@@ -205,7 +205,7 @@ class SungrowAdapter:
                 )
                 continue
             try:
-                device_time = self._parse_device_time(record.get("device_time"))
+                device_time = self._parse_device_datetime(record.get("device_time"))
                 metrics = {
                     point.column: self._parse_optional_decimal(record, point)
                     for point in PLANT_POINTS
@@ -218,18 +218,32 @@ class SungrowAdapter:
                     str(exc),
                 )
                 continue
+            target_date = self._fetched_at.astimezone(BANGKOK).date()
+            if device_time.date() != target_date:
+                LOGGER.error(
+                    "[sungrow][%s] collect_date mismatch plant_code=%s "
+                    "collect_date=%s target_date=%s",
+                    account_id,
+                    plant["code"],
+                    device_time.date().isoformat(),
+                    target_date.isoformat(),
+                )
+                continue
 
             meteo_name = None
             meteo_irradiation = None
+            slope_meteo_irradiation = None
             meteo_record = meteo_records.get(plant["code"])
             if meteo_record is not None:
                 try:
                     meteo_irradiation = self._parse_optional_decimal(
                         meteo_record, METEO_POINT
                     )
-                    device_time = self._parse_device_time(
-                        meteo_record.get("device_time")
-                    )
+                    if meteo_irradiation is None:
+                        slope_meteo_irradiation = self._parse_optional_decimal(
+                            meteo_record,
+                            SLOPE_METEO_POINT,
+                        )
                     name = meteo_record.get("device_name")
                     if isinstance(name, str) and name.strip():
                         meteo_name = name
@@ -250,9 +264,10 @@ class SungrowAdapter:
                     "plant_code": plant["code"],
                     **metrics,
                     METEO_POINT.column: meteo_irradiation,
+                    SLOPE_METEO_POINT.column: slope_meteo_irradiation,
                     "meteo_name": meteo_name,
                     "fetched_at": self._fetched_at.isoformat(),
-                    "collect_time": device_time,
+                    "collect_time": device_time.isoformat(),
                 }
             )
         return rows
@@ -264,16 +279,19 @@ class SungrowAdapter:
         plants: list[dict[str, Any]],
     ) -> dict[str, dict[str, Any]]:
         ps_key_to_code: dict[str, str] = {}
+        missing_meteo_count = 0
         for plant in plants:
             meteo = plant.get("meteo")
             if meteo is None:
-                LOGGER.error(
-                    "[sungrow][%s] missing meteo mapping plant_code=%s",
-                    account_id,
-                    plant["code"],
-                )
+                missing_meteo_count += 1
                 continue
             ps_key_to_code[meteo["ps_key"]] = plant["code"]
+        if missing_meteo_count:
+            LOGGER.info(
+                "[sungrow][%s] plants without meteo mapping count=%d",
+                account_id,
+                missing_meteo_count,
+            )
 
         meteo_batches = chunked_values(
             list(ps_key_to_code),

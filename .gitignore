@@ -3,11 +3,23 @@
 __pycache__/
 .pytest_cache/
 *.py[cod]
-data/**/*.csv
-logs/*.log
-logs/*.log.*
-datasource/*/.txt
-datasource/*/.csv
-config/*.yaml
+
+# Runtime output
+data/*
+logs/
+
+# Local project-only files
+AGENTS.md
+CONTEXT.md
+Dockerfile.fileserver
 meteo.txt
-scripts/*.py
+nginx.conf
+test_upload.py
+
+# Local helper/test/reference folders
+scripts/
+tests/
+docs/
+datasource/
+
+config/*.yaml

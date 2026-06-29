@@ -34,10 +34,17 @@ PLANT_POINTS = (
     PointDefinition("83022", "p83022", "daily_yield_wh"),
 )
 METEO_POINT = PointDefinition("2001", "p2001", "daily_irradiation_wh_m2")
-POINTS = PLANT_POINTS + (METEO_POINT,)
+SLOPE_METEO_POINT = PointDefinition(
+    "2005",
+    "p2005",
+    "slope_daily_irradiation_wh_m2",
+)
+METEO_POINTS = (METEO_POINT, SLOPE_METEO_POINT)
+POINTS = PLANT_POINTS + METEO_POINTS
 SCHEMA = BASE_COLUMNS + (
     PLANT_POINTS[0].column,
     METEO_POINT.column,
+    SLOPE_METEO_POINT.column,
     "meteo_name",
     "fetched_at",
     "collect_time",

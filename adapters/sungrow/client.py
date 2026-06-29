@@ -14,7 +14,7 @@ from .contract import (
     DATA_PATH,
     LANGUAGE,
     LOGIN_PATH,
-    METEO_POINT,
+    METEO_POINTS,
     PLANT_POINTS,
     BatchResult,
     DeviceType,
@@ -128,7 +128,7 @@ class SungrowClient:
                 "appkey": self._app_key,
                 "token": token,
                 "device_type": int(DeviceType.METEO),
-                "point_id_list": [METEO_POINT.point_id],
+                "point_id_list": [point.point_id for point in METEO_POINTS],
                 "ps_key_list": ps_keys,
             },
         )
